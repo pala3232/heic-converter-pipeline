@@ -3,7 +3,9 @@ provider "aws" {
 }
 
 terraform {
-  backend "s3" {}
+  backend "s3" {
+    region = "ap-southeast-2"
+  }
 }
 
 resource "random_string" "suffix" {
