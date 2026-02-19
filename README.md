@@ -4,14 +4,50 @@ An event-driven, serverless pipeline that converts HEIC photos to JPG using AWS.
 
 ## Architecture
 
-```
-S3 Upload (.heic)
-    → Lambda (s3-to-sqs)       generates job ID, writes PENDING to DynamoDB, sends to SQS
-    → SQS Queue                buffers conversion jobs
-    → Lambda (sqs-to-ecs)      triggers ECS Fargate task
-    → ECS Fargate Task         downloads HEIC, converts to JPG, uploads to destination S3
-    → DynamoDB                 job status tracked (PENDING → PROCESSING → COMPLETED/FAILED)
-    → SNS                      email notification on batch completion
+```mermaid
+graph LR
+    FE["S3 Frontend\nstatic site"]
+    CG["Cognito\nUser Pool · JWT"]
+
+    subgraph trigger["Upload Trigger"]
+        S1["S3 Source\n.heic uploads"]
+        L1["λ s3-to-sqs\ngenerate job · PENDING"]
+        SQ["SQS Queue\n+ Dead-Letter Queue"]
+        L2["λ sqs-to-ecs\nEventBridge"]
+        EC["ECS Fargate\nDocker · Python"]
+    end
+
+    subgraph outputs["Processing Outputs"]
+        S2["S3 Destination\n.jpg files"]
+        DB["DynamoDB\nPENDING → PROCESSING → DONE"]
+        SN["SNS\nemail notification"]
+    end
+
+    subgraph api["API Gateway"]
+        R1["POST /jobs\nλ post_jobs"]
+        R2["GET /jobs/{id}\nλ get_job"]
+        R3["GET /files\nλ list_files"]
+        R4["GET /converted\nλ list_converted"]
+        R5["GET /presigned\nλ get_presigned"]
+    end
+
+    FE -->|login| CG
+    CG --> R1 & R2 & R3 & R4 & R5
+
+    S1 -->|ObjectCreated| L1
+    L1 -->|SendMessage| SQ
+    SQ -->|EventBridge| L2
+    L2 -->|RunTask| EC
+
+    EC -->|PutObject| S2
+    EC -->|UpdateItem| DB
+    EC -->|Publish| SN
+
+    R1 -.->|write| DB
+    R2 -.->|read| DB
+    R3 -.->|list| S1
+    R4 -.->|list| S2
+    R5 -.->|presign| S2
 ```
 
 API Gateway (Cognito authenticated) exposes:
@@ -101,13 +137,12 @@ cp terraform/terraform.tfvars.example terraform/terraform.tfvars
 
 ```bash
 cd terraform
-cd terraform
 terraform init -backend-config=backend.tfvars  # ← only if you created this file
 # OR pass values directly
 terraform init \
--backend-config="bucket=your-state-bucket" \
--backend-config="key=converter/terraform.tfstate" \
--backend-config="region=ap-southeast-2"
+  -backend-config="bucket=your-state-bucket" \
+  -backend-config="key=converter/terraform.tfstate" \
+  -backend-config="region=ap-southeast-2"
 
 terraform apply
 ```
@@ -135,7 +170,7 @@ aws cognito-idp admin-confirm-sign-up \
 
 ## CI/CD
 
-GitHub Actions automatically builds and pushes the Docker image to ECR and runs `terraform apply` on every push to `main`. 
+GitHub Actions automatically builds and pushes the Docker image to ECR and runs `terraform apply` on every push to `main`.
 
 Three workflows are included:
 - **`docker-build-push.yml`** — builds Docker image, pushes to ECR, runs `terraform apply` on push to `main`
