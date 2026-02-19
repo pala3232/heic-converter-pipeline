@@ -12,7 +12,7 @@ table = dynamodb.Table(dynamodb_table)
 QUEUE_URL          = os.environ.get('QUEUE_URL')
 SOURCE_BUCKET      = os.environ.get('SOURCE_BUCKET')
 DESTINATION_BUCKET = os.environ.get('DESTINATION_BUCKET')
-ALLOWED_ORIGIN     = os.environ.get("CORS_ORIGIN", "*"),
+ALLOWED_ORIGIN     = os.environ.get("CORS_ORIGIN", "*")
 
 CORS_HEADERS = {
     "Access-Control-Allow-Origin":  ALLOWED_ORIGIN,
