@@ -1,0 +1,546 @@
+// fill these in before deploying
+// COGNITO_CLIENT_ID: found in AWS Console → Cognito → User Pools → App Clients
+// API_BASE_URL: output from terraform apply (api_gateway_url)
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>HEIC Converter</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0a; --surface: #111111; --border: #222222;
+      --accent: #e8ff47; --accent-dim: #b8cc2a;
+      --text: #f0f0f0; --muted: #555555; --error: #ff4747; --success: #47ff8a;
+    }
+    body {
+      background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace;
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; padding: 60px 20px; overflow-x: hidden;
+    }
+    body::before {
+      content: ''; position: fixed; top: -50%; left: -50%; width: 200%; height: 200%;
+      background: radial-gradient(ellipse at 70% 20%, rgba(232,255,71,0.04) 0%, transparent 60%),
+                  radial-gradient(ellipse at 20% 80%, rgba(232,255,71,0.03) 0%, transparent 50%);
+      pointer-events: none; z-index: 0;
+    }
+    .container { width: 100%; max-width: 620px; position: relative; z-index: 1; }
+    header { margin-bottom: 48px; animation: fadeUp 0.6s ease both; }
+    .logo { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); margin-bottom: 24px; }
+    h1 { font-family: 'Syne', sans-serif; font-size: clamp(36px, 8vw, 52px); font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
+    h1 span { color: var(--accent); }
+    .subtitle { margin-top: 12px; font-size: 13px; color: var(--muted); letter-spacing: 0.05em; }
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      padding: 32px; margin-bottom: 16px; animation: fadeUp 0.6s ease both; position: relative; overflow: hidden;
+    }
+    .card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .card.active::before { opacity: 1; }
+    .card:nth-child(2) { animation-delay: 0.1s; }
+    .card:nth-child(3) { animation-delay: 0.2s; }
+    .card:nth-child(4) { animation-delay: 0.3s; }
+    .card:nth-child(5) { animation-delay: 0.4s; }
+    .card-label {
+      font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 20px; display: flex; align-items: center; gap: 8px;
+    }
+    .card-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    .step-num { color: var(--accent); font-weight: 500; }
+    .field { margin-bottom: 16px; }
+    label { display: block; font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+    input {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      color: var(--text); font-family: 'DM Mono', monospace; font-size: 13px;
+      padding: 12px 14px; outline: none; transition: border-color 0.2s;
+    }
+    input:focus { border-color: var(--accent); }
+    input::placeholder { color: var(--muted); }
+    input[type="password"] { letter-spacing: 0.1em; }
+    button {
+      width: 100%; background: var(--accent); color: #0a0a0a; border: none;
+      font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase; padding: 14px;
+      cursor: pointer; transition: background 0.2s, transform 0.1s; margin-top: 8px;
+    }
+    button:hover { background: var(--accent-dim); }
+    button:active { transform: scale(0.99); }
+    button:disabled { background: var(--muted); cursor: not-allowed; color: #333; }
+    .btn-secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); margin-top: 8px; }
+    .btn-secondary:hover { background: rgba(232,255,71,0.05); }
+    .btn-success { background: var(--success); color: #0a0a0a; margin-top: 8px; }
+    .btn-success:hover { background: #33cc6e; }
+    .status-bar {
+      font-size: 12px; padding: 10px 14px; border-left: 2px solid var(--muted);
+      color: var(--muted); margin-top: 14px; transition: all 0.3s; min-height: 38px;
+    }
+    .status-bar.success { border-color: var(--success); color: var(--success); }
+    .status-bar.error { border-color: var(--error); color: var(--error); }
+    .status-bar.info { border-color: var(--accent); color: var(--accent); }
+    .file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-top: 4px; }
+    .file-card {
+      background: var(--bg); border: 1px solid var(--border); padding: 14px 12px;
+      cursor: pointer; transition: border-color 0.2s, background 0.2s; text-align: center; position: relative;
+    }
+    .file-card:hover { border-color: var(--accent); background: rgba(232,255,71,0.03); }
+    .file-card.selected { border-color: var(--accent); background: rgba(232,255,71,0.06); }
+    .file-card .check {
+      position: absolute; top: 6px; right: 6px; width: 16px; height: 16px;
+      border: 1px solid var(--border); border-radius: 50%; font-size: 9px;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s; background: var(--bg);
+    }
+    .file-card.selected .check { background: var(--accent); border-color: var(--accent); color: #0a0a0a; }
+    .file-icon { font-size: 28px; margin-bottom: 8px; display: block; }
+    .file-name { font-size: 10px; color: var(--muted); word-break: break-all; line-height: 1.4; }
+    .file-card.selected .file-name { color: var(--accent); }
+    .file-empty { font-size: 12px; color: var(--muted); padding: 20px 0; text-align: center; }
+    .selected-info { margin-top: 14px; font-size: 11px; color: var(--muted); padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); display: none; justify-content: space-between; align-items: center; }
+    .selected-info span { color: var(--accent); }
+    .selected-info .clear-btn { font-size: 10px; color: var(--muted); cursor: pointer; letter-spacing: 0.1em; text-transform: uppercase; border: none; background: none; font-family: 'DM Mono', monospace; padding: 0; width: auto; margin-top: 0; }
+    .selected-info .clear-btn:hover { color: var(--error); background: none; }
+    .job-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+    .job-row { background: var(--bg); border: 1px solid var(--border); padding: 14px 16px; font-size: 12px; line-height: 1.8; }
+    .job-row .key { color: var(--muted); }
+    .job-row .val { color: var(--text); }
+    .job-row .val.pending { color: #ffaa47; }
+    .job-row .val.completed { color: var(--success); }
+    .job-row .val.failed { color: var(--error); }
+    .job-row .val.processing { color: var(--accent); }
+    .job-row .val.error { color: var(--error); }
+    .locked { opacity: 0.35; pointer-events: none; }
+    .pulse { display: inline-block; width: 6px; height: 6px; background: var(--accent); border-radius: 50%; margin-right: 6px; animation: pulse 1.5s ease infinite; }
+    .progress-bar { height: 2px; background: var(--border); margin-top: 14px; overflow: hidden; display: none; }
+    .progress-fill { height: 100%; background: var(--accent); transition: width 0.4s ease; }
+    .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin-top: 16px; }
+    .photo-item { position: relative; background: var(--bg); border: 1px solid var(--border); overflow: hidden; aspect-ratio: 1; }
+    .photo-item img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity 0.4s; }
+    .photo-item img.loaded { opacity: 1; }
+    .photo-overlay {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: linear-gradient(transparent, rgba(0,0,0,0.85));
+      padding: 20px 8px 8px; opacity: 0; transition: opacity 0.2s;
+    }
+    .photo-item:hover .photo-overlay { opacity: 1; }
+    .photo-name { font-size: 9px; color: var(--text); word-break: break-all; line-height: 1.3; display: block; }
+    .photo-download {
+      display: inline-block; margin-top: 6px; font-size: 9px; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--accent); text-decoration: none;
+      font-family: 'Syne', sans-serif; font-weight: 700;
+    }
+    .photo-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 32px; }
+    @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.7); } }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+    .footer { margin-top: 40px; font-size: 11px; color: var(--muted); text-align: center; letter-spacing: 0.1em; animation: fadeUp 0.6s 0.4s ease both; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="logo">⟡ HEIC Pipeline</div>
+    <h1>Convert<br/><span>your photos</span></h1>
+    <p class="subtitle">// authenticated · event-driven · serverless</p>
+  </header>
+
+  <!-- 1: login -->
+  <div class="card active" id="card-login">
+    <div class="card-label"><span class="step-num">01</span> Authenticate</div>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="username" placeholder="you@example.com"/>
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="password" placeholder="••••••••"/>
+    </div>
+    <button id="btn-login" onclick="login()">Login via Cognito</button>
+    <div class="status-bar" id="login-status">Waiting for credentials...</div>
+  </div>
+
+  <!-- 2: browse / select files -->
+  <div class="card locked" id="card-files">
+    <div class="card-label"><span class="step-num">02</span> Select HEIC Files</div>
+    <div class="file-grid" id="file-grid">
+      <div class="file-empty">Authenticate to browse files...</div>
+    </div>
+    <div class="selected-info" id="selected-info">
+      <span><span id="selected-count">0</span> file(s) selected</span>
+      <button class="clear-btn" onclick="clearSelection()">Clear</button>
+    </div>
+    <button id="btn-convert" onclick="submitJob()" style="margin-top:16px" disabled>Convert Selected Files</button>
+    <div class="status-bar" id="submit-status">Select one or more files to convert...</div>
+  </div>
+
+  <!-- 3: job status -->
+  <div class="card locked" id="card-result">
+    <div class="card-label"><span class="step-num">03</span> Job Status</div>
+    <div class="status-bar" id="check-status">Waiting for jobs...</div>
+    <div class="progress-bar" id="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="job-list" id="job-list"></div>
+    <button class="btn-secondary" id="btn-poll" onclick="togglePoll()" style="display:none; margin-top:8px">Stop Polling</button>
+  </div>
+
+  <!-- 4: converted photos -->
+  <div class="card locked" id="card-gallery">
+    <div class="card-label"><span class="step-num">04</span> Converted Photos</div>
+    <div class="status-bar" id="gallery-status">Waiting for conversions...</div>
+    <div class="photo-grid" id="photo-grid"></div>
+    <button class="btn-success" id="btn-download-all" onclick="downloadAll()" style="display:none">⬇ Download All JPGs</button>
+    <button class="btn-secondary" id="btn-refresh-gallery" onclick="loadGallery()" style="display:none; margin-top:8px">↻ Refresh Gallery</button>
+  </div>
+
+  <div class="footer">HEIC → JPG · AWS Fargate · SQS · DynamoDB · SNS</div>
+</div>
+
+<script>
+  const COGNITO_CLIENT_ID = 'YOUR_COGNITO_CLIENT_ID';
+  const COGNITO_REGION    = 'ap-southeast-2';
+  const API_BASE_URL      = 'YOUR_API_GATEWAY_URL';
+
+  let idToken       = null;
+  let refreshToken  = null;
+  let selectedFiles = [];
+  let currentJobIds = [];
+  let pollInterval  = null;
+  let galleryFiles  = [];
+
+  function setStatus(id, msg, type = '') {
+    const el = document.getElementById(id);
+    el.innerHTML = msg;
+    el.className = 'status-bar ' + type;
+  }
+
+  function unlock(cardId) {
+    document.getElementById(cardId).classList.remove('locked');
+  }
+
+  //  TOKEN REFRESH
+  async function refreshIdToken() {
+    if (!refreshToken) throw new Error('Session expired, please log in again');
+    const res = await fetch(`https://cognito-idp.${COGNITO_REGION}.amazonaws.com/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-amz-json-1.1',
+        'X-Amz-Target': 'AWSCognitoIdentityProviderService.InitiateAuth'
+      },
+      body: JSON.stringify({
+        AuthFlow: 'REFRESH_TOKEN_AUTH',
+        ClientId: COGNITO_CLIENT_ID,
+        AuthParameters: { REFRESH_TOKEN: refreshToken }
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error('Session expired, please log in again');
+    idToken = data.AuthenticationResult.IdToken;
+  }
+
+  //  AUTHENTICATED FETCH (auto-refreshes token on 401/500) ──
+  async function apiFetch(url, options = {}) {
+    options.headers = { ...options.headers, 'Authorization': idToken };
+    let res = await fetch(url, options);
+    if (res.status === 401 || res.status === 500) {
+      try {
+        await refreshIdToken();
+        options.headers['Authorization'] = idToken;
+        res = await fetch(url, options);
+      } catch (e) {
+        throw new Error('Session expired, please log in again');
+      }
+    }
+    return res;
+  }
+
+  //  AUTH 
+  async function login() {
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+    if (!username || !password) { setStatus('login-status', 'Fill in both fields.', 'error'); return; }
+
+    const btn = document.getElementById('btn-login');
+    btn.disabled = true; btn.textContent = 'Authenticating...';
+    setStatus('login-status', 'Contacting Cognito...', 'info');
+
+    try {
+      const res = await fetch(`https://cognito-idp.${COGNITO_REGION}.amazonaws.com/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-amz-json-1.1', 'X-Amz-Target': 'AWSCognitoIdentityProviderService.InitiateAuth' },
+        body: JSON.stringify({ AuthFlow: 'USER_PASSWORD_AUTH', ClientId: COGNITO_CLIENT_ID, AuthParameters: { USERNAME: username, PASSWORD: password } })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || data.__type || 'Auth failed');
+      idToken = data.AuthenticationResult.IdToken;
+      refreshToken = data.AuthenticationResult.RefreshToken;
+      setStatus('login-status', '✓ Authenticated successfully', 'success');
+      document.getElementById('card-login').classList.remove('active');
+      unlock('card-files');
+      document.getElementById('card-files').classList.add('active');
+      loadFiles();
+      checkExistingGallery();
+    } catch (err) {
+      setStatus('login-status', '✗ ' + err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Login via Cognito';
+    }
+  }
+
+  //  SOURCE FILES 
+  async function loadFiles() {
+    const grid = document.getElementById('file-grid');
+    grid.innerHTML = '<div class="file-empty">Loading files...</div>';
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/files`);
+      const data = await res.json();
+      const files = data.files || [];
+      if (files.length === 0) { grid.innerHTML = '<div class="file-empty">No HEIC files found in source bucket.</div>'; return; }
+      grid.innerHTML = '';
+      files.forEach(key => {
+        const name = key.split('/').pop();
+        const card = document.createElement('div');
+        card.className = 'file-card';
+        card.dataset.key = key;
+        card.innerHTML = `<div class="check">✓</div><span class="file-icon">📷</span><div class="file-name">${name}</div>`;
+        card.onclick = () => toggleFile(key, card);
+        grid.appendChild(card);
+      });
+    } catch (err) {
+      grid.innerHTML = `<div class="file-empty">Error: ${err.message}</div>`;
+    }
+  }
+
+  //  SELECTION 
+  function toggleFile(key, cardEl) {
+    if (cardEl.classList.contains('selected')) {
+      cardEl.classList.remove('selected');
+      selectedFiles = selectedFiles.filter(f => f !== key);
+    } else {
+      cardEl.classList.add('selected');
+      selectedFiles.push(key);
+    }
+    updateSelectionUI();
+  }
+
+  function clearSelection() {
+    selectedFiles = [];
+    document.querySelectorAll('.file-card').forEach(c => c.classList.remove('selected'));
+    updateSelectionUI();
+  }
+
+  function updateSelectionUI() {
+    const info = document.getElementById('selected-info');
+    const count = selectedFiles.length;
+    if (count > 0) {
+      info.style.display = 'flex';
+      document.getElementById('selected-count').textContent = count;
+      document.getElementById('btn-convert').disabled = false;
+      document.getElementById('btn-convert').textContent = `Convert ${count} File${count > 1 ? 's' : ''}`;
+    } else {
+      info.style.display = 'none';
+      document.getElementById('btn-convert').disabled = true;
+      document.getElementById('btn-convert').textContent = 'Convert Selected Files';
+    }
+  }
+
+  //  SUBMIT 
+  async function submitJob() {
+    if (!selectedFiles.length) return;
+    const btn = document.getElementById('btn-convert');
+    btn.disabled = true; btn.textContent = 'Submitting...';
+    setStatus('submit-status', `Submitting ${selectedFiles.length} job(s)...`, 'info');
+    currentJobIds = [];
+
+    try {
+      for (const key of selectedFiles) {
+        const res = await apiFetch(`${API_BASE_URL}/jobs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.message || 'Request failed');
+        currentJobIds.push({ job_id: data.job_id, key });
+      }
+
+      setStatus('submit-status', `✓ ${currentJobIds.length} job(s) created`, 'success');
+      unlock('card-result');
+      document.getElementById('card-result').classList.add('active');
+      renderJobList(currentJobIds.map(j => ({ ...j, status: 'PENDING' })));
+      document.getElementById('progress-bar').style.display = 'block';
+      document.getElementById('progress-fill').style.width = '0%';
+      setStatus('check-status', `<span class="pulse"></span> Polling ${currentJobIds.length} job(s)...`, 'info');
+      startPoll();
+    } catch (err) {
+      setStatus('submit-status', '✗ ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      updateSelectionUI();
+    }
+  }
+
+  //  POLLING 
+  async function checkStatus() {
+    if (!currentJobIds.length) return;
+
+    const results = await Promise.all(currentJobIds.map(async ({ job_id, key }) => {
+      try {
+        const res = await apiFetch(`${API_BASE_URL}/jobs/${job_id}`);
+        const data = await res.json();
+        return { ...data, key: data.key || key };
+      } catch {
+        return { job_id, key, status: 'ERROR' };
+      }
+    }));
+
+    renderJobList(results);
+
+    const total = results.length;
+    const done = results.filter(r => ['completed', 'failed', 'error'].includes((r.status || '').toLowerCase())).length;
+    const allCompleted = results.every(r => (r.status || '').toLowerCase() === 'completed');
+    const allDone = done === total;
+
+    document.getElementById('progress-fill').style.width = `${(done / total) * 100}%`;
+
+    if (allDone) {
+      stopPoll();
+      document.getElementById('progress-fill').style.width = '100%';
+      setStatus('check-status',
+        allCompleted ? `✓ All ${total} conversions complete!` : `⚠ ${done}/${total} done — some jobs failed`,
+        allCompleted ? 'success' : 'error'
+      );
+      if (allCompleted) {
+        unlock('card-gallery');
+        document.getElementById('card-gallery').classList.add('active');
+        loadGallery();
+      }
+    } else {
+      setStatus('check-status', `<span class="pulse"></span> ${done}/${total} complete — polling...`, 'info');
+    }
+  }
+
+  function renderJobList(results) {
+    document.getElementById('job-list').innerHTML = results.map(data => {
+      const status = (data.status || '').toLowerCase();
+      const name = (data.key || '—').split('/').pop();
+      return `
+        <div class="job-row">
+          <div><span class="key">file     </span> <span class="val">${name}</span></div>
+          <div><span class="key">job_id   </span> <span class="val" style="font-size:10px">${data.job_id || '—'}</span></div>
+          <div><span class="key">status   </span> <span class="val ${status}">${data.status || '—'}</span></div>
+          ${data.error ? `<div><span class="key">error    </span> <span class="val failed">${data.error}</span></div>` : ''}
+        </div>`;
+    }).join('');
+  }
+
+  function startPoll() {
+    stopPoll();
+    pollInterval = setInterval(checkStatus, 5000);
+    document.getElementById('btn-poll').style.display = 'block';
+    checkStatus();
+  }
+
+  function stopPoll() { clearInterval(pollInterval); pollInterval = null; }
+
+  function togglePoll() {
+    if (pollInterval) { stopPoll(); document.getElementById('btn-poll').textContent = 'Resume Polling'; }
+    else { startPoll(); document.getElementById('btn-poll').textContent = 'Stop Polling'; }
+  }
+
+  //  GALLERY 
+  async function checkExistingGallery() {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/converted`);
+      const data = await res.json();
+      if ((data.files || []).length > 0) {
+        unlock('card-gallery');
+        document.getElementById('card-gallery').classList.add('active');
+        loadGallery();
+      }
+    } catch { /* silent */ }
+  }
+
+  async function loadGallery() {
+    const grid = document.getElementById('photo-grid');
+    grid.innerHTML = '';
+    setStatus('gallery-status', 'Loading converted photos...', 'info');
+
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/converted`);
+      const data = await res.json();
+      const files = data.files || [];
+
+      if (files.length === 0) {
+        setStatus('gallery-status', 'No converted files in output bucket.', '');
+        document.getElementById('btn-download-all').style.display = 'none';
+        document.getElementById('btn-refresh-gallery').style.display = 'block';
+        return;
+      }
+
+      setStatus('gallery-status', `✓ ${files.length} converted file(s)`, 'success');
+      document.getElementById('btn-download-all').style.display = 'block';
+      document.getElementById('btn-refresh-gallery').style.display = 'block';
+
+      const urlResults = await Promise.all(files.map(async key => {
+        try {
+          const r = await apiFetch(`${API_BASE_URL}/presigned?key=${encodeURIComponent(key)}`);
+          const d = await r.json();
+          return { key, url: d.url };
+        } catch {
+          return { key, url: null };
+        }
+      }));
+
+      galleryFiles = urlResults;
+      grid.innerHTML = '';
+
+      urlResults.forEach(({ key, url }) => {
+        const name = key.split('/').pop();
+        const item = document.createElement('div');
+        item.className = 'photo-item';
+        if (url) {
+          const img = document.createElement('img');
+          img.alt = name;
+          img.onload = () => img.classList.add('loaded');
+          img.onerror = () => { item.innerHTML = '<div class="photo-placeholder">⚠</div>'; };
+          img.src = url;
+          item.appendChild(img);
+          const overlay = document.createElement('div');
+          overlay.className = 'photo-overlay';
+          overlay.innerHTML = `
+            <span class="photo-name">${name}</span>
+            <a class="photo-download" href="${url}" download="${name}" target="_blank">⬇ Download</a>
+          `;
+          item.appendChild(overlay);
+        } else {
+          item.innerHTML = '<div class="photo-placeholder">⚠</div>';
+        }
+        grid.appendChild(item);
+      });
+
+    } catch (err) {
+      setStatus('gallery-status', '✗ ' + err.message, 'error');
+    }
+  }
+
+  async function downloadAll() {
+    for (const { url, key } of galleryFiles) {
+      if (!url) continue;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = key.split('/').pop();
+      a.target = '_blank';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      await new Promise(r => setTimeout(r, 300));
+    }
+  }
+
+  document.addEventListener('keydown', e => { if (e.key === 'Enter' && !idToken) login(); });
+</script>
+</body>
+</html>

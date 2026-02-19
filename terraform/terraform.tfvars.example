@@ -1,0 +1,13 @@
+# terraform/terraform.tfvars.example
+
+# Name of the existing S3 bucket containing source HEIC files
+source_bucket = "your-source-bucket-name"
+
+# Email address to receive SNS notifications on batch completion
+notification_email = "your@email.com"
+
+# URL of the deployed frontend S3 static website (output from frontend terraform)
+frontend_url = "https://s3-static-site-XXXXXXXX.s3.ap-southeast-2.amazonaws.com"
+
+# Docker image tag to deploy — set automatically by CI/CD to git commit SHA
+# image_tag = "latest"
