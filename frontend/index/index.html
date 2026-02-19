@@ -1,7 +1,3 @@
-// fill these in before deploying
-// COGNITO_CLIENT_ID: found in AWS Console → Cognito → User Pools → App Clients
-// API_BASE_URL: output from terraform apply (api_gateway_url)
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -199,9 +195,15 @@
 </div>
 
 <script>
-  const COGNITO_CLIENT_ID = 'YOUR_COGNITO_CLIENT_ID';
+
+  // ===============================
+  // IMPORTANT: Fill in these values before deploying
+  // COGNITO_CLIENT_ID: found in AWS Console → Cognito → User Pools → App Clients
+  // API_BASE_URL: output from terraform apply (api_gateway_url)
+  // ===============================
+  const COGNITO_CLIENT_ID = 'YOUR_COGNITO_CLIENT_ID_HERE';
   const COGNITO_REGION    = 'ap-southeast-2';
-  const API_BASE_URL      = 'YOUR_API_GATEWAY_URL';
+  const API_BASE_URL      = 'YOUR_API_BASE_URL_HERE';
 
   let idToken       = null;
   let refreshToken  = null;

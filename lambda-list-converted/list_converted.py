@@ -7,7 +7,7 @@ REGION = os.environ.get('AWS_REGION', 'ap-southeast-2')
 s3 = boto3.client('s3', region_name=REGION)
 
 CORS_HEADERS = {
-    "Access-Control-Allow-Origin": "https://s3-static-site-3pva4d0z.s3.ap-southeast-2.amazonaws.com",
+    "Access-Control-Allow-Origin": os.environ.get("CORS_ORIGIN", "*"),
     "Access-Control-Allow-Headers": "Content-Type,Authorization",
     "Access-Control-Allow-Methods": "GET,OPTIONS"
 }

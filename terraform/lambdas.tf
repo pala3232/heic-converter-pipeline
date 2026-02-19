@@ -139,6 +139,7 @@ resource "aws_lambda_function" "list_converted" {
   environment {
     variables = {
       DESTINATION_BUCKET = data.terraform_remote_state.source.outputs.bucket_name
+      CORS_ORIGIN        = var.frontend_url
     }
   }
 }
