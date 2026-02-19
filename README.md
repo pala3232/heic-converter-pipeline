@@ -5,49 +5,29 @@ An event-driven, serverless pipeline that converts HEIC photos to JPG using AWS.
 ## Architecture
 
 ```mermaid
-graph LR
-    FE["S3 Frontend\nstatic site"]
-    CG["Cognito\nUser Pool · JWT"]
+graph TB
+    FE["S3 Frontend"] -->|login| CG["Cognito · JWT"]
 
-    subgraph trigger["Upload Trigger"]
-        S1["S3 Source\n.heic uploads"]
-        L1["λ s3-to-sqs\ngenerate job · PENDING"]
-        SQ["SQS Queue\n+ Dead-Letter Queue"]
-        L2["λ sqs-to-ecs\nEventBridge"]
-        EC["ECS Fargate\nDocker · Python"]
+    CG --> API
+
+    subgraph API["API Gateway"]
+        direction LR
+        R1["POST /jobs"] --- R2["GET /jobs/{id}"] --- R3["GET /files"] --- R4["GET /converted"] --- R5["GET /presigned"]
     end
 
-    subgraph outputs["Processing Outputs"]
-        S2["S3 Destination\n.jpg files"]
-        DB["DynamoDB\nPENDING → PROCESSING → DONE"]
-        SN["SNS\nemail notification"]
+    API -->|trigger| S1
+
+    subgraph pipeline["Upload & Convert"]
+        direction LR
+        S1["S3 Source<br/>.heic"] -->|ObjectCreated| L1["λ s3-to-sqs"]
+        L1 -->|SendMessage| SQ["SQS Queue<br/>+ DLQ"]
+        SQ -->|EventBridge| L2["λ sqs-to-ecs"]
+        L2 -->|RunTask| EC["ECS Fargate<br/>Docker · Python"]
     end
 
-    subgraph api["API Gateway"]
-        R1["POST /jobs\nλ post_jobs"]
-        R2["GET /jobs/{id}\nλ get_job"]
-        R3["GET /files\nλ list_files"]
-        R4["GET /converted\nλ list_converted"]
-        R5["GET /presigned\nλ get_presigned"]
-    end
-
-    FE -->|login| CG
-    CG --> R1 & R2 & R3 & R4 & R5
-
-    S1 -->|ObjectCreated| L1
-    L1 -->|SendMessage| SQ
-    SQ -->|EventBridge| L2
-    L2 -->|RunTask| EC
-
-    EC -->|PutObject| S2
-    EC -->|UpdateItem| DB
-    EC -->|Publish| SN
-
-    R1 -.->|write| DB
-    R2 -.->|read| DB
-    R3 -.->|list| S1
-    R4 -.->|list| S2
-    R5 -.->|presign| S2
+    EC -->|PutObject| S2["S3 Destination<br/>.jpg"]
+    EC -->|UpdateItem| DB["DynamoDB<br/>PENDING → DONE"]
+    EC -->|Publish| SN["SNS\nemail"]
 ```
 
 API Gateway (Cognito authenticated) exposes:
