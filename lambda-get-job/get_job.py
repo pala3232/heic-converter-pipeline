@@ -1,6 +1,7 @@
 import boto3
 import json
 from decimal import Decimal
+import os
 
 dynamodb_table = os.environ.get('DYNAMODB_TABLE', 'iosglacierbackups-jobs')
 dynamodb = boto3.resource('dynamodb')

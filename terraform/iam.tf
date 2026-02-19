@@ -41,6 +41,18 @@ resource "aws_iam_role_policy" "lambda_policy" {
         Resource = [aws_ecs_task_definition.iosglacierbackups.arn]
       },
       {
+        Sid    = "S3DestinationAccess"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          "arn:aws:s3:::${data.terraform_remote_state.source.outputs.bucket_name}",
+          "arn:aws:s3:::${data.terraform_remote_state.source.outputs.bucket_name}/*"
+        ]
+      },
+      {
         Sid    = "IAMPassRole"
         Effect = "Allow"
         Action = ["iam:PassRole"]
