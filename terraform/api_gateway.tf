@@ -127,7 +127,7 @@ resource "aws_api_gateway_integration_response" "jobs_options_200" {
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
     "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = local.cors_origin
+    "method.response.header.Access-Control-Allow-Origin"  = "'${local.cors_origin}'"
   }
 }
 
@@ -191,7 +191,7 @@ resource "aws_api_gateway_integration_response" "job_id_options_200" {
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = local.cors_origin
+    "method.response.header.Access-Control-Allow-Origin"  = "'${local.cors_origin}'"
   }
 }
 
@@ -255,7 +255,7 @@ resource "aws_api_gateway_integration_response" "files_options_200" {
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = local.cors_origin
+    "method.response.header.Access-Control-Allow-Origin"  = "'${local.cors_origin}'"
   }
 }
 
@@ -319,7 +319,7 @@ resource "aws_api_gateway_integration_response" "converted_options_200" {
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = local.cors_origin
+    "method.response.header.Access-Control-Allow-Origin"  = "'${local.cors_origin}'"
   }
 }
 
@@ -383,6 +383,6 @@ resource "aws_api_gateway_integration_response" "presigned_options_200" {
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = local.cors_origin
+    "method.response.header.Access-Control-Allow-Origin"  = "'${local.cors_origin}'"
   }
 }
