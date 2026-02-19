@@ -6,8 +6,12 @@ An event-driven, serverless pipeline that converts HEIC photos to JPG using AWS.
 
 ```mermaid
 graph TB
-    FE["S3 Frontend"] -->|login| CG["Cognito · JWT"]
+    S1["S3 Source<br/>.heic upload"]
+    FE["S3 Frontend<br/>testing UI"]
 
+    S1 -->|"① direct upload / ObjectCreated"| L1
+
+    FE -->|login| CG["Cognito · JWT"]
     CG --> API
 
     subgraph API["API Gateway"]
@@ -15,19 +19,18 @@ graph TB
         R1["POST /jobs"] --- R2["GET /jobs/{id}"] --- R3["GET /files"] --- R4["GET /converted"] --- R5["GET /presigned"]
     end
 
-    API -->|trigger| S1
+    API -->|"② submit job"| L1["λ s3-to-sqs<br/>generate job · PENDING"]
 
-    subgraph pipeline["Upload & Convert"]
+    subgraph pipeline["Convert Pipeline"]
         direction LR
-        S1["S3 Source<br/>.heic"] -->|ObjectCreated| L1["λ s3-to-sqs"]
         L1 -->|SendMessage| SQ["SQS Queue<br/>+ DLQ"]
         SQ -->|EventBridge| L2["λ sqs-to-ecs"]
         L2 -->|RunTask| EC["ECS Fargate<br/>Docker · Python"]
     end
 
-    EC -->|PutObject| S2["S3 Destination<br/>.jpg"]
+    EC -->|PutObject| S2["S3 Destination<br/>.jpg files"]
     EC -->|UpdateItem| DB["DynamoDB<br/>PENDING → DONE"]
-    EC -->|Publish| SN["SNS\nemail"]
+    EC -->|Publish| SN["SNS<br/>email notification"]
 ```
 
 API Gateway (Cognito authenticated) exposes:
